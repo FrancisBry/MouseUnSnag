@@ -162,6 +162,13 @@ public static class StaticStuff
             Math.Max (Math.Min (P.X, R.Right - 1), R.Left),
             Math.Max (Math.Min (P.Y, R.Bottom - 1), R.Top));
 
+    // Allows scaling of points to shift from smaller monitors to large ones
+    // while keeping corners aligned
+    public static Point Scale(this Point P, double scaleX, double scaleY)
+        => new Point (
+            (int)(P.X * scaleX),
+            (int)(P.Y * scaleY));
+
     // In which direction(s) is(are) the point outside of the rectangle? If P is
     // inside R, then this returns (0,0). Else X and/or Y can be either -1 or
     // +1, depending on which direction P is outside R.
@@ -435,9 +442,35 @@ public class MouseUnSnag
         }
         else if (jumpScreen != null)
         {
-            NewCursor = jumpScreen.R.ClosestBoundaryPoint (cursor);
+            double scaleX, scaleY;
+            double translateX, translateY;
+
+            if (Math.Abs (StuckDirection.X) > 0) {
+                scaleX = Math.Sign (StuckDirection.X) * 
+                    (cursor.X - cursorScreen.Left) * jumpScreen.Width / 
+                    cursorScreen.Width;
+                translateX = jumpScreen.Left;
+            } else {
+                scaleX = 1;
+                translateX = 0;
+            }
+
+            if (Math.Abs (StuckDirection.Y) > 0) {
+                scaleY = Math.Sign (StuckDirection.Y) * 
+                    (cursor.Y - cursorScreen.Top) * jumpScreen.Height / 
+                    cursorScreen.Height;
+                translateY = jumpScreen.Top;
+            } else {
+                scaleY = 1;
+                translateY = 0;
+            }
+
+            Point transformCursor = cursor.Scale (scaleX, scaleY);
+            transformCursor.offset(translateX, translateY);
+
+            NewCursor = jumpScreen.R.ClosestBoundaryPoint (transformCursor);
         }
-        else if (StuckDirection.X != 0)
+        else if (StuckDirection.X != 0 && false) // Disable warp because I don't like it
         {
             NewCursor = WrapPoint (StuckDirection, cursor);
         }
