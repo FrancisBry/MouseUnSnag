@@ -421,54 +421,52 @@ public class MouseUnSnag
 //            $"mouse:{mouse}  cursor:{cursor} (OnMon#{cursorScreen}/{mouseScreen}) last:{LastMouse}  " +
 //            $"#UnSnags {NJumps}   {StuckString}        \r");
 
-        Console.Write ($" StuckDirection/Distance{StuckDirection}/{OutsideDistance(cursorScreen.R, mouse)} " +
-            $"cur_mouse:{mouse}  prev_mouse:{LastMouse} ==? cursor:{cursor} (OnMon#{cursorScreen}/{mouseScreen})  " +
-            $"#UnSnags {NJumps}   {StuckString}   \r");
-
-		LastMouse = mouse;
+				LastMouse = mouse;
 
         // Let caller know we did NOT jump the cursor.
         if (!IsStuck)
             return false;
 
-        SnagScreen jumpScreen = ScreenInDirection (StuckDirection, cursorScreen.R);
+				mouseScreen ??= ScreenInDirection (StuckDirection, cursorScreen.R);
 
         // If the mouse "location" (which can take on a value beyond the current
         // cursor screen) has a value, then it is "within" another valid screen
         // bounds, so just jump to it!
         if (mouseScreen != null)
         {
-            NewCursor = mouse;
-        }
-        else if (jumpScreen != null)
-        {
             double scaleX, scaleY;
-            double translateX, translateY;
+            int translateX, translateY;
 
-            if (Math.Abs (StuckDirection.X) > 0) {
-                scaleX = Math.Sign (StuckDirection.X) * 
-                    (cursor.X - cursorScreen.Left) * jumpScreen.Width / 
-                    cursorScreen.Width;
-                translateX = jumpScreen.Left;
-            } else {
-                scaleX = 1;
-                translateX = 0;
-            }
-
-            if (Math.Abs (StuckDirection.Y) > 0) {
-                scaleY = Math.Sign (StuckDirection.Y) * 
-                    (cursor.Y - cursorScreen.Top) * jumpScreen.Height / 
-                    cursorScreen.Height;
-                translateY = jumpScreen.Top;
-            } else {
+            if (Math.Abs (StuckDirection.X) > 0) 
+						{
+                scaleY = (double)(cursor.Y - cursorScreen.R.Top) / cursorScreen.R.Height;
+                translateY = mouseScreen.R.Top - cursorScreen.R.Top;
+            } 
+						else 
+						{
                 scaleY = 1;
                 translateY = 0;
             }
 
-            Point transformCursor = cursor.Scale (scaleX, scaleY);
-            transformCursor.offset(translateX, translateY);
+            if (Math.Abs (StuckDirection.Y) > 0) 
+						{
+                scaleX = (double)(cursor.X - cursorScreen.R.Left) / cursorScreen.R.Width;
+                translateX = mouseScreen.R.Left - cursorScreen.R.Left;
+            } 
+						else 
+						{
+                scaleX = 1;
+                translateX = 0;
+            }
+						
+						Console.Write($"Scale({scaleX}, {scaleY}), Translate({translateX}, {translateY}), StuckDirection{StuckDirection}\n\r");
+						Console.Write($"mouseScreen({mouseScreen}, T({mouseScreen.R.Top}), B({mouseScreen.R.Bottom}), L({mouseScreen.R.Left}), R({mouseScreen.R.Right}))\n\r");
+						Console.Write($"cursorScreen({cursorScreen}, T({cursorScreen.R.Top}), B({cursorScreen.R.Bottom}), L({cursorScreen.R.Left}), R({cursorScreen.R.Right}))\n\r");
 
-            NewCursor = jumpScreen.R.ClosestBoundaryPoint (transformCursor);
+            Point transformCursor = cursor.Scale (scaleX, scaleY);
+            transformCursor.Offset(translateX, translateY);
+
+            NewCursor = mouseScreen.R.ClosestBoundaryPoint (transformCursor);
         }
         else if (StuckDirection.X != 0 && false) // Disable warp because I don't like it
         {
@@ -478,7 +476,7 @@ public class MouseUnSnag
             return false;
 
         ++NJumps;
-		Console.Write($"\n -- JUMPED!!! --\n");
+				Console.Write($"\n -- JUMPED!!! --\n");
         return true;
     }
 
