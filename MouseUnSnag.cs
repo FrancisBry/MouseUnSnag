@@ -12,6 +12,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
+using System.Windows.Media;
 using Microsoft.Win32;
 
 using static StaticStuff;
@@ -329,8 +330,8 @@ public class SnagScreen
         SnagScreen closestScreen = null;
         foreach(var S in SnagScreen.All)
         {
-            dxSq = Math.Pow ((double)Math.Max (Rec.Left - P.X, 0, P.X - Rec.Right), 2.0);
-            dySq = Math.Pow ((double)Math.Max (Rec.Top - P.Y, 0, P.Y - Rec.Bottom), 2.0);
+            dxSq = Math.Pow ((double)Math.Max (Math.Max (Rec.Left - P.X, 0), P.X - Rec.Right), 2.0);
+            dySq = Math.Pow ((double)Math.Max (Math.Max (Rec.Top - P.Y, 0), P.Y - Rec.Bottom), 2.0);
 
             if (S.R != Rec && (dxSq + dySq) < distanceToClosest) 
             {
@@ -455,6 +456,11 @@ public class MouseUnSnag
         {
             int newCursorX, newCursorY;
 
+            Point relativeCursor = cursor - (Size)cursorScreen.R.Location;
+            Matrix transformationMatrix = new Matrix((double)mouseScreen.R.Width / cursorScreen.R.Width, 0, (double)mouseScreen.R.Height / cursorScreen.R.Height, 0, );
+
+            double scaleX = 1, scaleY = 1;
+            double offsetX = 0, offsetY = 0;
             if (Math.Abs (StuckDirection.X) > 0) 
             {
                 newCursorY = (int)(((double)(cursor.Y - cursorScreen.R.Top) * mouseScreen.R.Height / cursorScreen.R.Height) + mouseScreen.R.Top);
