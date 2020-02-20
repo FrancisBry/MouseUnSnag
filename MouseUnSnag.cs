@@ -162,12 +162,11 @@ public static class StaticStuff
             Math.Max (Math.Min (P.X, R.Right - 1), R.Left),
             Math.Max (Math.Min (P.Y, R.Bottom - 1), R.Top));
 
-    // Allows scaling of points to shift from smaller monitors to large ones
-    // while keeping corners aligned
-    public static Point Scale(this Point P, double scaleX, double scaleY)
+
+    public static Point TransformAroundPoint(this Point P, Point C, double scaleX, double scaleY)
         => new Point (
-            (int)(P.X * scaleX),
-            (int)(P.Y * scaleY));
+            (int)((P.X * scaleX) + (C.X - (C.X * scaleX))),
+            (int)((P.Y * scaleY) + (C.Y - (C.Y * scaleY))));
 
     // In which direction(s) is(are) the point outside of the rectangle? If P is
     // inside R, then this returns (0,0). Else X and/or Y can be either -1 or
@@ -312,14 +311,35 @@ public class SnagScreen
         // screen" is where the Cursor (NOT the mouse!!) is currently).
         foreach(var S in SnagScreen.All)
         {
-            if (((Dir.X == 1) && (CurScreen.Right == S.R.Left)) ||
+            if ((((Dir.X == 1) && (CurScreen.Right == S.R.Left)) ||
                 ((Dir.X == -1) && (CurScreen.Left == S.R.Right)) ||
-                ((Dir.Y == 1) && (CurScreen.Bottom == S.R.Top)) ||
-                ((Dir.Y == -1) && (CurScreen.Top == S.R.Bottom)))
-
+                Dir.X == 0) &&
+                (((Dir.Y == 1) && (CurScreen.Bottom == S.R.Top)) ||
+                ((Dir.Y == -1) && (CurScreen.Top == S.R.Bottom)) ||
+                Dir.Y == 0))
                 return S;
         }
         return null;
+    }
+
+    public static SnagScreen ClosestScreen (Point P, Rectangle Rec = default(Rectangle))
+    {
+        double distanceToClosest = Double.PositiveInfinity;
+        double dxSq, dySq;
+        SnagScreen closestScreen = null;
+        foreach(var S in SnagScreen.All)
+        {
+            dxSq = Math.Pow ((double)Math.Max (Rec.Left - P.X, 0, P.X - Rec.Right), 2.0);
+            dySq = Math.Pow ((double)Math.Max (Rec.Top - P.Y, 0, P.Y - Rec.Bottom), 2.0);
+
+            if (S.R != Rec && (dxSq + dySq) < distanceToClosest) 
+            {
+                closestScreen = S;
+                distanceToClosest = dxSq + dySq;
+            }
+        }
+
+        return closestScreen;
     }
 
     // May want to update the above routine, which arbitrarily selects the monitor that
@@ -412,61 +432,54 @@ public class MouseUnSnag
         Point Dir = Direction (cursor, mouse);
         SnagScreen cursorScreen = WhichScreen (cursor);
         SnagScreen mouseScreen = WhichScreen (mouse);
+        bool screenChanged = mouseScreen != cursorScreen;
         bool IsStuck = (cursor != LastMouse) && (mouseScreen != cursorScreen);
         Point StuckDirection = OutsideDirection (cursorScreen.R, mouse);
 
-        string StuckString = IsStuck ? "--STUCK--" : "         ";
-		
-//        Console.Write ($" FarOut{StuckDirection}/{OutsideDis//tance(cursorScreen.R, mouse)} " +
-//            $"mouse:{mouse}  cursor:{cursor} (OnMon#{cursorScreen}/{mouseScreen}) last:{LastMouse}  " +
-//            $"#UnSnags {NJumps}   {StuckString}        \r");
-
-				LastMouse = mouse;
+        LastMouse = mouse;
 
         // Let caller know we did NOT jump the cursor.
-        if (!IsStuck)
+        // if (!IsStuck)
+        //     return false;
+        if (!screenChanged)
             return false;
 
-				mouseScreen ??= ScreenInDirection (StuckDirection, cursorScreen.R);
+        mouseScreen ??= ScreenInDirection (StuckDirection, cursorScreen.R);
+        
+        mouseScreen ??= ClosestScreen (mouse, cursorScreen.R);
 
         // If the mouse "location" (which can take on a value beyond the current
         // cursor screen) has a value, then it is "within" another valid screen
         // bounds, so just jump to it!
         if (mouseScreen != null)
         {
-            double scaleX, scaleY;
-            int translateX, translateY;
+            int newCursorX, newCursorY;
 
             if (Math.Abs (StuckDirection.X) > 0) 
-						{
-                scaleY = (double)(cursor.Y - cursorScreen.R.Top) / cursorScreen.R.Height;
-                translateY = mouseScreen.R.Top - cursorScreen.R.Top;
+            {
+                newCursorY = (int)(((double)(cursor.Y - cursorScreen.R.Top) * mouseScreen.R.Height / cursorScreen.R.Height) + mouseScreen.R.Top);
             } 
-						else 
-						{
-                scaleY = 1;
-                translateY = 0;
+            else 
+            {
+                newCursorY = cursor.Y;
             }
 
             if (Math.Abs (StuckDirection.Y) > 0) 
-						{
-                scaleX = (double)(cursor.X - cursorScreen.R.Left) / cursorScreen.R.Width;
-                translateX = mouseScreen.R.Left - cursorScreen.R.Left;
+            {
+                newCursorX = (int)(((double)(cursor.X - cursorScreen.R.Left) * mouseScreen.R.Width / cursorScreen.R.Width) + mouseScreen.R.Left);
             } 
-						else 
-						{
-                scaleX = 1;
-                translateX = 0;
+            else 
+            {
+                newCursorX = cursor.X;
             }
-						
-						Console.Write($"Scale({scaleX}, {scaleY}), Translate({translateX}, {translateY}), StuckDirection{StuckDirection}\n\r");
-						Console.Write($"mouseScreen({mouseScreen}, T({mouseScreen.R.Top}), B({mouseScreen.R.Bottom}), L({mouseScreen.R.Left}), R({mouseScreen.R.Right}))\n\r");
-						Console.Write($"cursorScreen({cursorScreen}, T({cursorScreen.R.Top}), B({cursorScreen.R.Bottom}), L({cursorScreen.R.Left}), R({cursorScreen.R.Right}))\n\r");
 
-            Point transformCursor = cursor.Scale (scaleX, scaleY);
-            transformCursor.Offset(translateX, translateY);
+            NewCursor = new Point (newCursorX, newCursorY);
+            NewCursor = mouseScreen.R.ClosestBoundaryPoint (NewCursor);
 
-            NewCursor = mouseScreen.R.ClosestBoundaryPoint (transformCursor);
+            Console.Write($"StuckDirection:{StuckDirection}\n");
+            Console.Write($"Mouse:{mouse}, Cursor:{cursor}, NewCursor:{NewCursor}\n");
+            Console.Write($"mouseScreen({mouseScreen}, T({mouseScreen.R.Top}), B({mouseScreen.R.Bottom}), L({mouseScreen.R.Left}), R({mouseScreen.R.Right}), H({mouseScreen.R.Height}), W({mouseScreen.R.Width}))\n\r");
+            Console.Write($"cursorScreen({cursorScreen}, T({cursorScreen.R.Top}), B({cursorScreen.R.Bottom}), L({cursorScreen.R.Left}), R({cursorScreen.R.Right}), H({cursorScreen.R.Height}), W({cursorScreen.R.Width}))\n\r");
         }
         else if (StuckDirection.X != 0 && false) // Disable warp because I don't like it
         {
@@ -476,7 +489,7 @@ public class MouseUnSnag
             return false;
 
         ++NJumps;
-				Console.Write($"\n -- JUMPED!!! --\n");
+        Console.Write($"\n -- JUMPED!!! --\n");
         return true;
     }
 
