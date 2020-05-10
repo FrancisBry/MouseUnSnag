@@ -12,7 +12,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
-using System.Windows.Media;
 using Microsoft.Win32;
 
 using static StaticStuff;
@@ -323,26 +322,6 @@ public class SnagScreen
         return null;
     }
 
-    public static SnagScreen ClosestScreen (Point P, Rectangle Rec = default(Rectangle))
-    {
-        double distanceToClosest = Double.PositiveInfinity;
-        double dxSq, dySq;
-        SnagScreen closestScreen = null;
-        foreach(var S in SnagScreen.All)
-        {
-            dxSq = Math.Pow ((double)Math.Max (Math.Max (Rec.Left - P.X, 0), P.X - Rec.Right), 2.0);
-            dySq = Math.Pow ((double)Math.Max (Math.Max (Rec.Top - P.Y, 0), P.Y - Rec.Bottom), 2.0);
-
-            if (S.R != Rec && (dxSq + dySq) < distanceToClosest) 
-            {
-                closestScreen = S;
-                distanceToClosest = dxSq + dySq;
-            }
-        }
-
-        return closestScreen;
-    }
-
     // May want to update the above routine, which arbitrarily selects the monitor that
     // happens to come first in the for() loop. We should probably do a little extra work,
     // and select the monitor that is closest to the mouse position.
@@ -446,8 +425,6 @@ public class MouseUnSnag
             return false;
 
         mouseScreen ??= ScreenInDirection (StuckDirection, cursorScreen.R);
-        
-        mouseScreen ??= ClosestScreen (mouse, cursorScreen.R);
 
         // If the mouse "location" (which can take on a value beyond the current
         // cursor screen) has a value, then it is "within" another valid screen
@@ -456,11 +433,6 @@ public class MouseUnSnag
         {
             int newCursorX, newCursorY;
 
-            Point relativeCursor = cursor - (Size)cursorScreen.R.Location;
-            Matrix transformationMatrix = new Matrix((double)mouseScreen.R.Width / cursorScreen.R.Width, 0, (double)mouseScreen.R.Height / cursorScreen.R.Height, 0, );
-
-            double scaleX = 1, scaleY = 1;
-            double offsetX = 0, offsetY = 0;
             if (Math.Abs (StuckDirection.X) > 0) 
             {
                 newCursorY = (int)(((double)(cursor.Y - cursorScreen.R.Top) * mouseScreen.R.Height / cursorScreen.R.Height) + mouseScreen.R.Top);
@@ -481,11 +453,6 @@ public class MouseUnSnag
 
             NewCursor = new Point (newCursorX, newCursorY);
             NewCursor = mouseScreen.R.ClosestBoundaryPoint (NewCursor);
-
-            Console.Write($"StuckDirection:{StuckDirection}\n");
-            Console.Write($"Mouse:{mouse}, Cursor:{cursor}, NewCursor:{NewCursor}\n");
-            Console.Write($"mouseScreen({mouseScreen}, T({mouseScreen.R.Top}), B({mouseScreen.R.Bottom}), L({mouseScreen.R.Left}), R({mouseScreen.R.Right}), H({mouseScreen.R.Height}), W({mouseScreen.R.Width}))\n\r");
-            Console.Write($"cursorScreen({cursorScreen}, T({cursorScreen.R.Top}), B({cursorScreen.R.Bottom}), L({cursorScreen.R.Left}), R({cursorScreen.R.Right}), H({cursorScreen.R.Height}), W({cursorScreen.R.Width}))\n\r");
         }
         else if (StuckDirection.X != 0 && false) // Disable warp because I don't like it
         {
